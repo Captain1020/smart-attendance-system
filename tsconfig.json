@@ -18,6 +18,8 @@
         "name": "next"
       }
     ],
+    "types": ["node"],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
