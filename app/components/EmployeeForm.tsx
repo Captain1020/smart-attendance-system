@@ -3,23 +3,25 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function EmployeeForm() {
+type EmployeeFormProps = {
+  onEmployeeAdded: () => void;
+};
+
+export default function EmployeeForm({ onEmployeeAdded }: EmployeeFormProps) {
   const [employeeId, setEmployeeId] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.from("employees").insert([
-      {
-        employee_id: employeeId,
-        name: name,
-        department: department,
-      },
-    ]);
+    const { error } = await supabase.from("employees").insert({
+      employee_id: employeeId,
+      name: name,
+      department: department,
+    });
 
     setLoading(false);
 
@@ -27,9 +29,14 @@ export default function EmployeeForm() {
       alert("Error adding employee: " + error.message);
     } else {
       alert("Employee added successfully ✅");
+
+      // reset form
       setEmployeeId("");
       setName("");
       setDepartment("");
+
+      // 🔴 VERY IMPORTANT: refresh employee list
+      onEmployeeAdded();
     }
   }
 
