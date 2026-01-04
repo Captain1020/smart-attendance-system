@@ -1,34 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import EmployeeForm from "@/app/components/EmployeeForm";
-import EmployeeList from "@/app/components/EmployeeList";
-import Attendance from "@/app/components/Attendance";
-import AttendanceHistory from "@/app/components/AttendanceHistory";
-import MonthlyAttendanceReport from "@/app/components/MonthlyAttendanceReport";
-import AbsentDetection from "@/app/components/AbsentDetection";
 
-
-
+type Employee = {
+  id: number;
+  employee_id: string;
+  name: string;
+  department: string;
+  face_descriptor: number[] | null;
+};
 
 export default function EmployeesPage() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleEmployeeAdded = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  async function loadEmployees() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("employees")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (!error && data) {
+      setEmployees(data);
+    }
+
+    setLoading(false);
+  }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Employees</h1>
+    <>
+      <h2 className="text-2xl font-semibold mb-6">Employees</h2>
 
-      <EmployeeForm onEmployeeAdded={handleEmployeeAdded} />
-      <EmployeeList refreshKey={refreshKey} />
-      <Attendance />
-      <AttendanceHistory/>
-      <MonthlyAttendanceReport />
-      <AbsentDetection/>
+      {/* Add Employee */}
+      <EmployeeForm onEmployeeAdded={loadEmployees} />
 
-    </div>
+      {/* Employee Table */}
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3">Employee ID</th>
+              <th className="p-3">Name</th>
+              <th className="p-3">Department</th>
+              <th className="p-3">Face Registered</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center">
+                  Loading...
+                </td>
+              </tr>
+            )}
+
+            {!loading && employees.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center">
+                  No employees found
+                </td>
+              </tr>
+            )}
+
+            {employees.map((emp) => (
+              <tr key={emp.id} className="border-t">
+                <td className="p-3">{emp.employee_id}</td>
+                <td className="p-3">{emp.name}</td>
+                <td className="p-3">{emp.department}</td>
+                <td className="p-3">
+                  {emp.face_descriptor ? (
+                    <span className="text-green-600 font-semibold">✅ Yes</span>
+                  ) : (
+                    <span className="text-red-600 font-semibold">❌ No</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
