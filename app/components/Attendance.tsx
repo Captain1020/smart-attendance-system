@@ -7,7 +7,7 @@ import FaceCapture from "@/app/components/FaceCapture";
 /* ---------- CONFIG ---------- */
 const CAMPUS_LAT = 11.513944566899058;
 const CAMPUS_LNG = 77.24670983047233;
-const ALLOWED_RADIUS = 2000; // meters (dev-friendly)
+const ALLOWED_RADIUS = 2000; // meters
 
 /* ---------- HELPERS ---------- */
 function getDistanceInMeters(
@@ -42,19 +42,21 @@ export default function Attendance() {
   const [employeeId, setEmployeeId] = useState("");
   const [loading, setLoading] = useState(false);
   const [showFace, setShowFace] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   async function startPunchIn() {
     if (!employeeId) {
-      alert("Enter Employee ID");
+      setStatus("❗ Please enter Employee ID");
       return;
     }
 
     if (!navigator.geolocation) {
-      alert("GPS not supported");
+      setStatus("❌ GPS not supported on this device");
       return;
     }
 
     setLoading(true);
+    setStatus("📍 Checking location...");
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -68,17 +70,17 @@ export default function Attendance() {
         );
 
         if (distance > ALLOWED_RADIUS) {
-          alert("❌ You are outside the campus location");
+          setStatus("❌ You are outside campus location");
           setLoading(false);
           return;
         }
 
-        // GPS passed → now require face
+        setStatus("✅ Location verified. Please verify face");
         setShowFace(true);
         setLoading(false);
       },
       () => {
-        alert("Location permission denied");
+        setStatus("❌ Location permission denied");
         setLoading(false);
       }
     );
@@ -86,8 +88,8 @@ export default function Attendance() {
 
   async function handleFaceVerified(liveDescriptor: number[]) {
     setLoading(true);
+    setStatus("🔍 Verifying face...");
 
-    /* 1️⃣ Fetch employee + stored face */
     const { data: employee, error } = await supabase
       .from("employees")
       .select("id, face_descriptor")
@@ -95,24 +97,22 @@ export default function Attendance() {
       .single();
 
     if (error || !employee?.face_descriptor) {
-      alert("❌ Employee face not registered");
+      setStatus("❌ Face not registered for this employee");
       setLoading(false);
       return;
     }
 
-    /* 2️⃣ Compare face */
     const distance = faceDistance(
       liveDescriptor,
       employee.face_descriptor
     );
 
     if (distance > 0.6) {
-      alert("❌ Face mismatch. Attendance denied");
+      setStatus("❌ Face mismatch. Attendance denied");
       setLoading(false);
       return;
     }
 
-    /* 3️⃣ Mark attendance */
     const today = new Date().toISOString().split("T")[0];
 
     const { data: existing } = await supabase
@@ -123,7 +123,7 @@ export default function Attendance() {
       .single();
 
     if (existing) {
-      alert("⚠️ Attendance already marked today");
+      setStatus("⚠️ Attendance already marked today");
       setLoading(false);
       return;
     }
@@ -137,27 +137,32 @@ export default function Attendance() {
       });
 
     if (insertError) {
-      alert(insertError.message);
+      setStatus(insertError.message);
     } else {
-      alert("✅ Attendance marked successfully");
+      setStatus("✅ Attendance marked successfully");
     }
 
-    // reset
     setEmployeeId("");
     setShowFace(false);
     setLoading(false);
   }
 
   return (
-    <div className="border p-4 rounded mt-6">
-      <h2 className="text-xl font-semibold mb-4">
-        Attendance Punch (GPS + Face)
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-center">
+        Attendance Punch
       </h2>
 
+      {status && (
+        <div className="text-center text-sm bg-gray-100 p-3 rounded">
+          {status}
+        </div>
+      )}
+
       {!showFace && (
-        <>
+        <div className="space-y-3">
           <input
-            className="border p-2 w-full mb-3"
+            className="border p-3 w-full rounded"
             placeholder="Employee ID"
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
@@ -166,20 +171,21 @@ export default function Attendance() {
           <button
             onClick={startPunchIn}
             disabled={loading}
-            className="bg-green-600 text-white px-4 py-2 rounded"
+            className="w-full py-3 text-lg bg-green-600 text-white rounded-lg"
           >
             {loading ? "Checking..." : "Punch In"}
           </button>
-        </>
+        </div>
       )}
 
       {showFace && (
-        <>
-          <p className="mb-2 text-sm text-gray-600">
-            Verify face to complete attendance
+        <div className="space-y-3">
+          <p className="text-sm text-center text-gray-600">
+            Step 2: Verify your face
           </p>
+
           <FaceCapture onCapture={handleFaceVerified} />
-        </>
+        </div>
       )}
     </div>
   );
