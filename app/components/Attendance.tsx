@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import FaceCapture from "@/app/components/FaceCapture";
 
 /* ---------- CONFIG ---------- */
 const CAMPUS_LAT = 11.513944566899058;
 const CAMPUS_LNG = 77.24670983047233;
-const ALLOWED_RADIUS = 2000; // meters
+const ALLOWED_RADIUS = 2000;
 
 /* ---------- HELPERS ---------- */
 function getDistanceInMeters(
@@ -21,37 +21,84 @@ function getDistanceInMeters(
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+      Math.sin(dLon / 2) ** 2;
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
 function faceDistance(a: number[], b: number[]) {
-  return Math.sqrt(
-    a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0)
-  );
+  return Math.sqrt(a.reduce((sum, val, i) => sum + (val - b[i]) ** 2, 0));
 }
 
 /* ---------- COMPONENT ---------- */
-export default function Attendance() {
-  const [employeeId, setEmployeeId] = useState("");
+type AttendanceProps = {
+  disabled?: boolean;
+};
+
+export default function Attendance({ disabled = false }: AttendanceProps) {
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [storedFace, setStoredFace] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [showFace, setShowFace] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
+  /* ✅ Load logged‑in employee once */
+  useEffect(() => {
+    init();
+  }, []);
+
+  async function init() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user?.email) {
+      setStatus("❌ Not logged in");
+      return;
+    }
+
+    const { data: employee, error } = await supabase
+      .from("employees")
+      .select("employee_id, face_descriptor")
+      .eq("email", user.email)
+      .single();
+
+    if (error || !employee) {
+      setStatus("❌ Employee record not found");
+      return;
+    }
+
+    setEmployeeId(employee.employee_id);
+    setStoredFace(employee.face_descriptor);
+
+    if (
+      !Array.isArray(employee.face_descriptor) ||
+      employee.face_descriptor.length === 0
+    ) {
+      setStatus(
+        "⚠️ Face not registered. Please contact admin before punching attendance."
+      );
+    }
+  }
+
+  /* ---------- Punch In ---------- */
   async function startPunchIn() {
-    if (!employeeId) {
-      setStatus("❗ Please enter Employee ID");
+    if (disabled) {
+  setStatus("⚠️ Face not registered. Contact admin.");
+  return;
+}
+    if (!employeeId) return;
+
+    if (!storedFace) {
+      setStatus("⚠️ Face not registered. Attendance blocked.");
       return;
     }
 
     if (!navigator.geolocation) {
-      setStatus("❌ GPS not supported on this device");
+      setStatus("❌ GPS not supported");
       return;
     }
 
@@ -60,23 +107,21 @@ export default function Attendance() {
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const { latitude, longitude } = pos.coords;
-
-        const distance = getDistanceInMeters(
-          latitude,
-          longitude,
+        const d = getDistanceInMeters(
+          pos.coords.latitude,
+          pos.coords.longitude,
           CAMPUS_LAT,
           CAMPUS_LNG
         );
 
-        if (distance > ALLOWED_RADIUS) {
-          setStatus("❌ You are outside campus location");
+        if (d > ALLOWED_RADIUS) {
+          setStatus("❌ Outside campus");
           setLoading(false);
           return;
         }
 
-        setStatus("✅ Location verified. Please verify face");
         setShowFace(true);
+        setStatus("✅ Location verified. Verify face");
         setLoading(false);
       },
       () => {
@@ -86,29 +131,15 @@ export default function Attendance() {
     );
   }
 
-  async function handleFaceVerified(liveDescriptor: number[]) {
+  /* ---------- Face Verify ---------- */
+  async function handleFaceVerified(live: number[]) {
+    if (!storedFace || !employeeId) return;
+
     setLoading(true);
     setStatus("🔍 Verifying face...");
 
-    const { data: employee, error } = await supabase
-      .from("employees")
-      .select("id, face_descriptor")
-      .eq("employee_id", employeeId)
-      .single();
-
-    if (error || !employee?.face_descriptor) {
-      setStatus("❌ Face not registered for this employee");
-      setLoading(false);
-      return;
-    }
-
-    const distance = faceDistance(
-      liveDescriptor,
-      employee.face_descriptor
-    );
-
-    if (distance > 0.6) {
-      setStatus("❌ Face mismatch. Attendance denied");
+    if (faceDistance(live, storedFace) > 0.6) {
+      setStatus("❌ Face mismatch");
       setLoading(false);
       return;
     }
@@ -128,30 +159,21 @@ export default function Attendance() {
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("attendance")
-      .insert({
-        employee_id: employeeId,
-        date: today,
-        punch_in: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("attendance").insert({
+      employee_id: employeeId,
+      date: today,
+      punch_in: new Date().toISOString(),
+    });
 
-    if (insertError) {
-      setStatus(insertError.message);
-    } else {
-      setStatus("✅ Attendance marked successfully");
-    }
-
-    setEmployeeId("");
+    setStatus(error ? error.message : "✅ Attendance marked successfully");
     setShowFace(false);
     setLoading(false);
   }
 
+  /* ---------- UI ---------- */
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-center">
-        Attendance Punch
-      </h2>
+      <h2 className="text-xl font-bold text-center">Attendance Punch</h2>
 
       {status && (
         <div className="text-center text-sm bg-gray-100 p-3 rounded">
@@ -160,33 +182,19 @@ export default function Attendance() {
       )}
 
       {!showFace && (
-        <div className="space-y-3">
-          <input
-            className="border p-3 w-full rounded"
-            placeholder="Employee ID"
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-          />
+        <button
+  onClick={startPunchIn}
+  disabled={loading || disabled}
+  className={`w-full py-3 text-lg rounded-lg text-white ${
+    disabled ? "bg-gray-400 cursor-not-allowed" : "bg-green-600"
+  }`}
+>
 
-          <button
-            onClick={startPunchIn}
-            disabled={loading}
-            className="w-full py-3 text-lg bg-green-600 text-white rounded-lg"
-          >
-            {loading ? "Checking..." : "Punch In"}
-          </button>
-        </div>
+          {loading ? "Checking..." : "Punch In"}
+        </button>
       )}
 
-      {showFace && (
-        <div className="space-y-3">
-          <p className="text-sm text-center text-gray-600">
-            Step 2: Verify your face
-          </p>
-
-          <FaceCapture onCapture={handleFaceVerified} />
-        </div>
-      )}
+      {showFace && <FaceCapture onCapture={handleFaceVerified} />}
     </div>
   );
 }

@@ -18,20 +18,39 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     setLoading(false);
 
-    if (error) {
-      alert(error.message);
+    if (error || !data.user) {
+      alert(error?.message || "Login failed");
       return;
     }
 
-    // ✅ ADMIN ONLY
-    router.replace("/dashboard");
+    // ✅ ADMIN LOGIN
+    if (data.user.email === "admin@company.com") {
+      router.replace("/dashboard");
+      return;
+    }
+
+    // ✅ EMPLOYEE LOGIN CHECK
+    const { data: employee, error: empError } = await supabase
+      .from("employees")
+      .select("employee_id")
+      .eq("email", data.user.email)
+      .single();
+
+    if (empError || !employee) {
+      alert("You are not registered as an employee");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    // ✅ EMPLOYEE DASHBOARD
+    router.replace("/attendance");
   }
 
   return (
@@ -42,7 +61,9 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-gray-800">
             Smart Attendance
           </h1>
-          <p className="text-sm text-gray-500">Admin Login</p>
+          <p className="text-sm text-gray-500">
+            Admin / Employee Login
+          </p>
         </div>
 
         <div className="mb-4">

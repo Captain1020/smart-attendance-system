@@ -23,44 +23,80 @@ export default function FaceRegister({
   onClose,
 }: FaceRegisterProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
   const [loading, setLoading] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
 
+  /* ---------------- LOAD MODELS + CAMERA ---------------- */
   useEffect(() => {
-    async function loadModels() {
-      const MODEL_URL = "/models";
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    let stream: MediaStream | null = null;
+
+    async function init() {
+      try {
+        const MODEL_URL = "/models";
+
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+
+        setModelsLoaded(true);
+
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play();
+            setCameraReady(true);
+          };
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Camera or model loading failed");
+      }
     }
 
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    }
-
-    loadModels().then(startCamera);
+    init();
 
     return () => {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream)
-          .getTracks()
-          .forEach((t) => t.stop());
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
 
+  /* ---------------- REGISTER FACE ---------------- */
   async function registerFace() {
     if (!videoRef.current) return;
+
+    if (!modelsLoaded || !cameraReady) {
+      alert("Camera not ready yet. Please wait.");
+      return;
+    }
+
+    if (!employee?.id) {
+      alert("Employee not found. Reload and try again.");
+      return;
+    }
 
     setLoading(true);
 
     const detection = await faceapi
-      .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .detectSingleFace(
+        videoRef.current,
+        new faceapi.TinyFaceDetectorOptions({
+          inputSize: 416,
+          scoreThreshold: 0.5,
+        })
+      )
       .withFaceLandmarks()
       .withFaceDescriptor();
 
     if (!detection) {
-      alert("No face detected. Try again.");
+      alert("❌ No clear face detected. Try better lighting.");
       setLoading(false);
       return;
     }
@@ -70,22 +106,26 @@ export default function FaceRegister({
     const { error } = await supabase
       .from("employees")
       .update({ face_descriptor: descriptor })
-      .eq("id", employee.id);
+      .eq("id", employee.id)
+      .select();
 
     setLoading(false);
 
     if (error) {
-      alert(error.message);
-    } else {
-      alert("✅ Face registered successfully");
-      await onSuccess(descriptor);
-      onClose();
+      console.error(error);
+      alert("Failed to save face data");
+      return;
     }
+
+    alert("✅ Face registered successfully");
+    await onSuccess(descriptor);
+    onClose();
   }
 
+  /* ---------------- UI ---------------- */
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded w-full max-w-md space-y-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-xl w-full max-w-md space-y-4">
         <h2 className="text-xl font-semibold">
           Register Face – {employee.name}
         </h2>
@@ -94,14 +134,19 @@ export default function FaceRegister({
           ref={videoRef}
           autoPlay
           muted
-          className="w-full rounded border"
+          playsInline
+          className="w-full rounded-lg border"
         />
+
+        <p className="text-sm text-gray-600">
+          Ensure good lighting and face the camera clearly.
+        </p>
 
         <div className="flex gap-3">
           <button
             onClick={registerFace}
-            disabled={loading}
-            className="bg-black text-white px-4 py-2 rounded"
+            disabled={loading || !modelsLoaded || !cameraReady}
+            className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
           >
             {loading ? "Registering..." : "Capture Face"}
           </button>
