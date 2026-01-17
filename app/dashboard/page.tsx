@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import StatCard from "../components/StatCard";
+import MobileBottomNav from "@/app/components/MobileBottomNav";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -54,43 +55,51 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Loading dashboard…</p>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <p className="text-gray-500 text-sm">Loading dashboard…</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Admin Dashboard
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Overview of today’s attendance
-        </p>
+    <>
+      {/* MAIN CONTAINER */}
+      <div className="min-h-screen bg-gray-50 px-4 py-6 pb-24">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* HEADER */}
+          <div className="bg-white rounded-xl shadow p-5">
+            <h1 className="text-2xl font-bold text-blue-700">
+              Admin Dashboard
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Today’s attendance overview
+            </p>
+          </div>
+
+          {/* STATS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Total Employees"
+              value={String(totalEmployees)}
+            />
+            <StatCard
+              title="Present Today"
+              value={String(presentToday)}
+            />
+            <StatCard
+              title="Absent Today"
+              value={String(absentToday)}
+            />
+            <StatCard
+              title="Late Entries"
+              value="--"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Employees"
-          value={String(totalEmployees)}
-        />
-        <StatCard
-          title="Present Today"
-          value={String(presentToday)}
-        />
-        <StatCard
-          title="Absent Today"
-          value={String(absentToday)}
-        />
-        <StatCard
-          title="Late Entries"
-          value="--"
-        />
-      </div>
-    </div>
+      {/* MOBILE NAVIGATION */}
+      <MobileBottomNav />
+    </>
   );
 }

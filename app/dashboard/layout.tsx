@@ -1,30 +1,51 @@
 "use client";
 
+import { useState } from "react";
 import Sidebar from "@/app/components/Sidebar";
-import Link from "next/link";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex bg-gray-100">
-      
+
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 bg-black text-white">
         <Sidebar />
       </aside>
 
+      {/* Mobile Sidebar Overlay */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <aside className="w-64 bg-black text-white">
+            <Sidebar />
+          </aside>
+
+          {/* Overlay */}
+          <div
+            className="flex-1 bg-black/50"
+            onClick={() => setMenuOpen(false)}
+          />
+        </div>
+      )}
+
       {/* Main Area */}
       <div className="flex-1 flex flex-col">
 
         {/* Mobile Top Bar */}
-        <div className="md:hidden bg-black text-white p-4 flex justify-between">
+        <div className="md:hidden bg-black text-white p-4 flex justify-between items-center">
           <span className="font-bold">Smart Attendance</span>
-          <Link href="/employees" className="text-sm underline">
+
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="text-sm underline"
+          >
             Menu
-          </Link>
+          </button>
         </div>
 
         {/* Page Content */}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import MobileBottomNav from "@/app/components/MobileBottomNav";
 
 type Attendance = {
   id: number;
@@ -23,7 +24,6 @@ export default function EmployeeAttendancePage() {
   async function init() {
     setLoading(true);
 
-    // 1️⃣ Get logged-in user
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -33,13 +33,11 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // ❌ Admin blocked
     if (user.email === "admin@company.com") {
       router.replace("/dashboard");
       return;
     }
 
-    // 2️⃣ Fetch employee + face info
     const { data: employee, error: empError } = await supabase
       .from("employees")
       .select("employee_id, face_descriptor")
@@ -51,22 +49,16 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    // ✅ Check face registration
     setFaceRegistered(
       Array.isArray(employee.face_descriptor) &&
         employee.face_descriptor.length > 0
     );
 
-    // 3️⃣ Fetch attendance records
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("attendance")
       .select("id, date, status")
       .eq("employee_id", employee.employee_id)
       .order("date", { ascending: false });
-
-    if (error) {
-      console.error(error);
-    }
 
     setRecords(data || []);
     setLoading(false);
@@ -74,39 +66,73 @@ export default function EmployeeAttendancePage() {
 
   return (
     <>
-      <h2 className="text-2xl font-semibold mb-4">My Attendance</h2>
+      {/* PAGE WRAPPER */}
+      <div className="min-h-screen bg-gray-100 px-4 pt-6 pb-24">
+        <div className="max-w-3xl mx-auto">
+          {/* HEADER */}
+          <div className="mb-6 text-center">
+            <h1 className="text-2xl font-bold text-gray-900">
+              My Attendance
+            </h1>
+            <p className="text-gray-600 mt-1">
+              View your daily attendance history
+            </p>
+          </div>
 
-      {!faceRegistered && !loading && (
-        <div className="mb-4 rounded-lg bg-yellow-100 border border-yellow-300 p-4 text-yellow-800">
-          ⚠️ <strong>Face not registered.</strong> Please contact admin to
-          complete face registration before punching attendance.
+          {/* FACE WARNING */}
+          {!faceRegistered && !loading && (
+            <div className="mb-5 rounded-xl bg-yellow-100 border border-yellow-300 p-4 text-yellow-800 text-sm">
+              ⚠️ <strong>Face not registered.</strong>
+              <br />
+              Please contact admin to complete face registration.
+            </div>
+          )}
+
+          {/* CONTENT CARD */}
+          <div className="bg-white rounded-xl shadow-md p-4">
+            {loading && (
+              <p className="text-center text-gray-500 py-6">
+                Loading attendance…
+              </p>
+            )}
+
+            {!loading && records.length === 0 && (
+              <p className="text-center text-gray-500 py-6">
+                No attendance records found
+              </p>
+            )}
+
+            {!loading && records.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
+                  <thead className="bg-blue-50 text-blue-800 text-sm">
+                    <tr>
+                      <th className="p-3 text-left">Date</th>
+                      <th className="p-3 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {records.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="border-t hover:bg-gray-50"
+                      >
+                        <td className="p-3">{r.date}</td>
+                        <td className="p-3 font-medium">
+                          {r.status ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
-      {loading && <p>Loading...</p>}
-
-      {!loading && records.length === 0 && (
-        <p className="text-gray-500">No attendance records found</p>
-      )}
-
-      {!loading && records.length > 0 && (
-        <table className="w-full border rounded">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3">Date</th>
-              <th className="p-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="p-3">{r.date}</td>
-                <td className="p-3">{r.status ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {/* MOBILE NAV */}
+      <MobileBottomNav />
     </>
   );
 }
