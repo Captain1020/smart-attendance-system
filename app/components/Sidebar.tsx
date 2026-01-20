@@ -1,54 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function Sidebar() {
-  const pathname = usePathname();
+  const router = useRouter();
 
-  const linkClass = (path: string) =>
-    `block px-3 py-2 rounded-md transition ${
-      pathname === path
-        ? "bg-white text-black font-semibold"
-        : "text-gray-300 hover:text-white hover:bg-gray-800"
-    }`;
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace("/login");
+  }
 
   return (
-    <aside className="w-64 bg-black text-white min-h-screen p-6">
+    <aside className="w-64 bg-black text-white min-h-screen p-6 flex flex-col">
       <h1 className="text-xl font-bold mb-8">
         Smart Attendance
       </h1>
 
-      <nav className="space-y-2 text-sm">
-        <p className="text-gray-400 uppercase text-xs mb-2">
-          Admin
-        </p>
+      <nav className="space-y-3 text-sm flex-1">
+        {/* ADMIN */}
+        <p className="text-gray-400 uppercase text-xs mt-4">Admin</p>
 
-        <Link href="/dashboard" className={linkClass("/dashboard")}>
-          📊 Dashboard
+        <Link href="/dashboard" className="block hover:text-gray-300">
+          Dashboard
         </Link>
 
-        <Link
-          href="/dashboard/attendance"
-          className={linkClass("/dashboard/attendance")}
-        >
-          📋 Attendance
+        <Link href="/dashboard/attendance" className="block hover:text-gray-300">
+          Attendance
         </Link>
 
-        <Link
-          href="/employees"
-          className={linkClass("/employees")}
-        >
-          👥 Employees
+        <Link href="/employees" className="block hover:text-gray-300">
+          Employees
         </Link>
 
-        <Link
-          href="/register"
-          className={linkClass("/register")}
-        >
-          ➕ Register Employee
+        {/* EMPLOYEE */}
+        <p className="text-gray-400 uppercase text-xs mt-6">Employee</p>
+
+        <Link href="/employee/attendance" className="block hover:text-gray-300">
+          My Attendance
+        </Link>
+
+        <Link href="/employee/profile" className="block hover:text-gray-300">
+          My Profile
         </Link>
       </nav>
+
+      {/* LOGOUT */}
+      <button
+        onClick={handleLogout}
+        className="mt-6 w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-semibold"
+      >
+        Logout
+      </button>
     </aside>
   );
 }

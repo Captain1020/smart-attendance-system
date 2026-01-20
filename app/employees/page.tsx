@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import FaceRegister from "@/app/components/FaceRegister";
+import InlineEditEmployeeModal from "@/app/components/InlineEditEmployeeModal";
 
 type Employee = {
   id: number;
@@ -11,23 +14,40 @@ type Employee = {
   face_descriptor: number[] | null;
 };
 
+const PAGE_SIZE = 6;
+
 export default function EmployeesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const page = Number(searchParams.get("page") || 1);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
+
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<Employee | null>(null);
+  const [editEmployee, setEditEmployee] =
+    useState<Employee | null>(null);
 
   useEffect(() => {
     loadEmployees();
-  }, []);
+  }, [page]);
 
   async function loadEmployees() {
     setLoading(true);
-    const { data } = await supabase
+
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, count } = await supabase
       .from("employees")
-      .select("*")
-      .order("id", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("id", { ascending: false })
+      .range(from, to);
 
     setEmployees(data || []);
+    setTotal(count || 0);
     setLoading(false);
   }
 
@@ -37,71 +57,128 @@ export default function EmployeesPage() {
     loadEmployees();
   }
 
-  async function saveEdit() {
-    if (!editEmployee) return;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
-    await supabase
-      .from("employees")
-      .update({
-        name: editEmployee.name,
-        department: editEmployee.department,
-      })
-      .eq("id", editEmployee.id);
-
-    setEditEmployee(null);
-    loadEmployees();
+  function goToPage(p: number) {
+    router.push(`?page=${p}`);
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Employees</h2>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-linear-to-r from-indigo-500 to-purple-500 text-white rounded-xl p-5 shadow">
-          <p className="text-sm opacity-80">Total Employees</p>
-          <p className="text-3xl font-bold mt-2">{employees.length}</p>
+        <div className="bg-linear-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+          Total: {total}
         </div>
       </div>
 
-      {/* DESKTOP TABLE */}
-      <div className="hidden md:block bg-white rounded-xl shadow overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-100 text-sm">
+      {loading && <p className="text-gray-500">Loading employees…</p>}
+
+      {/* ================= MOBILE CARDS ================= */}
+      <div className="grid gap-4 md:hidden">
+        {employees.map((emp) => (
+          <div
+            key={emp.id}
+            className="bg-white rounded-xl shadow border p-4 space-y-3"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs text-gray-500">Employee ID</p>
+                <p className="font-semibold">{emp.employee_id}</p>
+              </div>
+
+              <span
+                className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                  emp.face_descriptor
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {emp.face_descriptor ? "Face ✓" : "Face ✕"}
+              </span>
+            </div>
+
+            <div>
+              <p className="text-lg font-bold text-blue-700">
+                {emp.name}
+              </p>
+              <p className="text-sm text-gray-600">
+                {emp.department}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedEmployee(emp)}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm"
+              >
+                Register Face
+              </button>
+
+              <button
+                onClick={() => setEditEmployee(emp)}
+                className="px-3 bg-indigo-100 text-indigo-700 rounded-lg"
+              >
+                ✏️
+              </button>
+
+              <button
+                onClick={() => deleteEmployee(emp.id)}
+                className="px-3 bg-red-100 text-red-700 rounded-lg"
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= DESKTOP TABLE ================= */}
+      <div className="hidden md:block bg-white rounded-xl shadow border overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-blue-50 text-blue-800">
             <tr>
-              <th className="p-4 text-left">ID</th>
-              <th className="p-4 text-left">Name</th>
-              <th className="p-4 text-left">Department</th>
-              <th className="p-4 text-left">Face</th>
-              <th className="p-4 text-left">Actions</th>
+              <th className="p-4">Employee ID</th>
+              <th className="p-4">Name</th>
+              <th className="p-4">Department</th>
+              <th className="p-4">Face</th>
+              <th className="p-4">Action</th>
             </tr>
           </thead>
           <tbody>
-            {employees.map((e) => (
-              <tr key={e.id} className="border-t">
-                <td className="p-4">{e.employee_id}</td>
-                <td className="p-4">{e.name}</td>
-                <td className="p-4">{e.department}</td>
+            {employees.map((emp) => (
+              <tr key={emp.id} className="border-t">
+                <td className="p-4">{emp.employee_id}</td>
+                <td className="p-4 font-medium">{emp.name}</td>
+                <td className="p-4">{emp.department}</td>
                 <td className="p-4">
-                  {e.face_descriptor ? (
-                    <span className="text-green-600 font-semibold">✔ Registered</span>
+                  {emp.face_descriptor ? (
+                    <span className="text-green-600 font-semibold">
+                      Yes
+                    </span>
                   ) : (
-                    <span className="text-red-500 font-semibold">✖ Not Registered</span>
+                    <span className="text-red-600 font-semibold">
+                      No
+                    </span>
                   )}
                 </td>
-                <td className="p-4 flex gap-2">
+                <td className="p-4 space-x-2">
                   <button
-                    onClick={() => setEditEmployee(e)}
-                    className="px-3 py-1 rounded bg-blue-600 text-white text-sm"
+                    onClick={() => setSelectedEmployee(emp)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded"
                   >
-                    Edit
+                    Face
                   </button>
                   <button
-                    onClick={() => deleteEmployee(e.id)}
-                    className="px-3 py-1 rounded bg-red-600 text-white text-sm"
+                    onClick={() => setEditEmployee(emp)}
+                    className="text-indigo-600 text-sm hover:underline"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => deleteEmployee(emp.id)}
+                    className="bg-red-100 text-red-700 px-3 py-1 rounded"
                   >
                     Delete
                   </button>
@@ -110,100 +187,64 @@ export default function EmployeesPage() {
             ))}
           </tbody>
         </table>
-
-        {!loading && employees.length === 0 && (
-          <p className="p-6 text-center text-gray-500">
-            No employees found
-          </p>
-        )}
       </div>
 
-      {/* MOBILE CARD VIEW */}
-      <div className="md:hidden space-y-4">
-        {employees.map((e) => (
-          <div
-            key={e.id}
-            className="bg-white rounded-xl shadow p-4 space-y-2"
+      {/* ================= PAGINATION ================= */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 pt-4">
+          <button
+            disabled={page === 1}
+            onClick={() => goToPage(page - 1)}
+            className="px-3 py-1 border rounded disabled:opacity-40"
           >
-            <div className="flex justify-between">
-              <p className="font-semibold">{e.name}</p>
-              <span className="text-xs text-gray-500">{e.employee_id}</span>
-            </div>
+            Prev
+          </button>
 
-            <p className="text-sm text-gray-600">
-              Dept: <strong>{e.department}</strong>
-            </p>
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goToPage(i + 1)}
+              className={`px-3 py-1 rounded ${
+                page === i + 1
+                  ? "bg-blue-600 text-white"
+                  : "border"
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
 
-            <p className="text-sm">
-              Face:{" "}
-              {e.face_descriptor ? (
-                <span className="text-green-600 font-semibold">Registered</span>
-              ) : (
-                <span className="text-red-500 font-semibold">Not Registered</span>
-              )}
-            </p>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setEditEmployee(e)}
-                className="flex-1 bg-blue-600 text-white py-2 rounded"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => deleteEmployee(e.id)}
-                className="flex-1 bg-red-600 text-white py-2 rounded"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* EDIT MODAL */}
-      {editEmployee && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold">Edit Employee</h3>
-
-            <input
-              value={editEmployee.name}
-              onChange={(e) =>
-                setEditEmployee({ ...editEmployee, name: e.target.value })
-              }
-              className="w-full border p-2 rounded"
-              placeholder="Name"
-            />
-
-            <input
-              value={editEmployee.department}
-              onChange={(e) =>
-                setEditEmployee({
-                  ...editEmployee,
-                  department: e.target.value,
-                })
-              }
-              className="w-full border p-2 rounded"
-              placeholder="Department"
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setEditEmployee(null)}
-                className="px-4 py-2 border rounded"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                className="px-4 py-2 bg-black text-white rounded"
-              >
-                Save
-              </button>
-            </div>
-          </div>
+          <button
+            disabled={page === totalPages}
+            onClick={() => goToPage(page + 1)}
+            className="px-3 py-1 border rounded disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
+      )}
+
+      {/* MODALS */}
+      {selectedEmployee && (
+        <FaceRegister
+          employee={selectedEmployee}
+          onClose={() => setSelectedEmployee(null)}
+          onSuccess={async () => {
+            setSelectedEmployee(null);
+            loadEmployees();
+          }}
+        />
+      )}
+
+      {editEmployee && (
+        <InlineEditEmployeeModal
+          employee={editEmployee}
+          onClose={() => setEditEmployee(null)}
+          onUpdated={async () => {
+            setEditEmployee(null);
+            loadEmployees();
+          }}
+        />
       )}
     </div>
   );

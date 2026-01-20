@@ -140,6 +140,7 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
         employee_id: employeeId,
         date: today,
         punch_in: new Date().toISOString(),
+        status: "present",
       });
 
     if (insertError) {
