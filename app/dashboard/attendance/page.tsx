@@ -23,7 +23,6 @@ export default function AdminAttendancePage() {
   async function loadAttendance() {
     setLoading(true);
 
-    // 1️⃣ Get attendance records
     const { data: attendance, error } = await supabase
       .from("attendance")
       .select("id, date, status, punch_in, employee_id")
@@ -42,16 +41,14 @@ export default function AdminAttendancePage() {
       return;
     }
 
-    // 2️⃣ Get employees
     const { data: employees } = await supabase
       .from("employees")
       .select("employee_id, name");
 
-    // 3️⃣ Merge attendance + employee name
     const merged = attendance.map((a) => ({
       ...a,
       employeeName:
-        employees?.find((e) => e.employee_id === a.employee_id)?.name ||
+        employees?.find((e) => e.employee_id === a.employee_id)?.name ??
         "Unknown",
     }));
 
@@ -60,41 +57,71 @@ export default function AdminAttendancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6">
+    <div className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Attendance History</h1>
+        {/* HEADER */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Attendance History
+          </h1>
+          <p className="text-sm text-slate-600">
+            Daily employee punch-in records
+          </p>
+        </div>
 
-        {loading && <p className="text-gray-500">Loading…</p>}
-
-        {!loading && rows.length === 0 && (
-          <p className="text-gray-500">No attendance records found</p>
+        {/* STATES */}
+        {loading && (
+          <p className="text-slate-600 font-medium">Loading attendance…</p>
         )}
 
+        {!loading && rows.length === 0 && (
+          <p className="text-slate-600 font-medium">
+            No attendance records found
+          </p>
+        )}
+
+        {/* TABLE */}
         {!loading && rows.length > 0 && (
-          <div className="overflow-x-auto bg-white rounded-xl shadow border">
-            <table className="w-full text-sm">
-              <thead className="bg-blue-50 text-blue-800">
+          <div className="overflow-x-auto bg-white rounded-xl shadow-md border border-slate-200">
+            <table className="w-full text-sm sm:text-base">
+              <thead className="bg-slate-200 text-slate-900">
                 <tr>
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-left">Employee</th>
-                  <th className="p-3 text-left">Punch In</th>
-                  <th className="p-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left font-semibold">Date</th>
+                  <th className="px-4 py-3 text-left font-semibold">Employee</th>
+                  <th className="px-4 py-3 text-left font-semibold">
+                    Punch In
+                  </th>
+                  <th className="px-4 py-3 text-left font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody>
+
+              <tbody className="divide-y divide-slate-200">
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="p-3">{r.date}</td>
-                    <td className="p-3 font-medium">
-                      {r.employeeName} ({r.employee_id})
+                  <tr
+                    key={r.id}
+                    className="hover:bg-slate-50 transition"
+                  >
+                    <td className="px-4 py-3 text-slate-900 font-medium">
+                      {new Date(r.date).toLocaleDateString()}
                     </td>
-                    <td className="p-3">
+
+                    <td className="px-4 py-3 text-slate-900">
+                      <div className="font-semibold">
+                        {r.employeeName}
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {r.employee_id}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-900 font-medium">
                       {r.punch_in
                         ? new Date(r.punch_in).toLocaleTimeString()
                         : "-"}
                     </td>
-                    <td className="p-3">
-                      <span className="px-2 py-1 rounded bg-green-100 text-green-700 text-xs">
+
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">
                         Present
                       </span>
                     </td>

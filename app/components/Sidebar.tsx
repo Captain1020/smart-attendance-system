@@ -33,8 +33,13 @@ export default function Sidebar() {
         <Link href="/employees" className="block hover:text-gray-300">
           Employees
         </Link>
+        <Link href="/register" className="block hover:text-gray-300">
+                     
+                      Register
+           </Link>
+        
 
-        {/* EMPLOYEE */}
+        {/* EMPLOYEE
         <p className="text-gray-400 uppercase text-xs mt-6">Employee</p>
 
         <Link href="/employee/attendance" className="block hover:text-gray-300">
@@ -43,7 +48,7 @@ export default function Sidebar() {
 
         <Link href="/employee/profile" className="block hover:text-gray-300">
           My Profile
-        </Link>
+        </Link> */}
       </nav>
 
       {/* LOGOUT */}

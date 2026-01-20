@@ -1,78 +1,101 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import MobileBottomNav from "@/app/components/MobileBottomNav";
 
-type Role = "admin" | "employee";
+type Employee = {
+  employee_id: string;
+  name: string;
+  email: string;
+  department: string;
+  role: string;
+};
 
-export default function MobileBottomNav() {
-  const [role, setRole] = useState<Role | null>(null);
+export default function EmployeeProfilePage() {
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadRole();
+    loadProfile();
   }, []);
 
-  async function loadRole() {
+  async function loadProfile() {
+    setLoading(true);
+
+    // 1️⃣ Get logged-in user
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user?.email) return;
-
-    if (user.email === "admin@company.com") {
-      setRole("admin");
-    } else {
-      setRole("employee");
+    if (userError || !user) {
+      setError("User not logged in");
+      setLoading(false);
+      return;
     }
+
+    // 2️⃣ Fetch employee data using auth_user_id
+    const { data, error } = await supabase
+      .from("employees")
+      .select("employee_id, name, email, department, role")
+      .eq("auth_user_id", user.id)
+      .single();
+
+    if (error) {
+      console.error(error);
+      setError("Failed to load profile");
+    } else {
+      setEmployee(data);
+    }
+
+    setLoading(false);
   }
 
-  if (!role) return null;
-
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow md:hidden">
-      <div className="flex justify-around py-2 text-xs font-medium text-gray-700">
-        {role === "admin" ? (
-          <>
-            <Link href="/dashboard" className="flex flex-col items-center">
-              📊
-              <span>Dashboard</span>
-            </Link>
+    <div className="min-h-screen bg-gray-50 px-4 py-6 pb-24">
+      <div className="max-w-md mx-auto bg-white rounded-2xl shadow p-6 space-y-4">
+        <h1 className="text-2xl font-bold text-blue-700 text-center">
+          My Profile
+        </h1>
 
-            <Link href="/dashboard/attendance" className="flex flex-col items-center">
-              📋
-              <span>Attendance</span>
-            </Link>
+        {loading && (
+          <p className="text-center text-gray-500">Loading profile…</p>
+        )}
 
-            <Link href="/dashboard/employees" className="flex flex-col items-center">
-              👥
-              <span>Employees</span>
-            </Link>
+        {error && (
+          <p className="text-center text-red-600">{error}</p>
+        )}
 
-            <Link href="/dashboard/employees/add" className="flex flex-col items-center">
-              ➕
-              <span>Add</span>
-            </Link>
-          </>
-        ) : (
-          <>
-            <Link href="/attendance" className="flex flex-col items-center">
-              🕒
-              <span>Punch</span>
-            </Link>
-
-            <Link href="/employee/attendance" className="flex flex-col items-center">
-              📄
-              <span>History</span>
-            </Link>
-
-            <Link href="/employee/profile" className="flex flex-col items-center">
-              👤
-              <span>Profile</span>
-            </Link>
-          </>
+        {employee && (
+          <div className="space-y-3 text-sm">
+            <ProfileRow label="Employee ID" value={employee.employee_id} />
+            <ProfileRow label="Name" value={employee.name} />
+            <ProfileRow label="Email" value={employee.email} />
+            <ProfileRow label="Department" value={employee.department} />
+            <ProfileRow label="Role" value={employee.role} />
+          </div>
         )}
       </div>
-    </nav>
+
+      <MobileBottomNav />
+    </div>
+  );
+}
+
+/* ---------- SMALL HELPER COMPONENT ---------- */
+function ProfileRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex justify-between border-b pb-2">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium text-gray-900">{value}</span>
+    </div>
   );
 }
