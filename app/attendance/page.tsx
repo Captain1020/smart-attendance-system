@@ -15,7 +15,30 @@ const CAMPUS_LAT = 11.513944566899058;
 const CAMPUS_LNG = 77.24670983047233;
 const ALLOWED_RADIUS = 2000; // meters
 
+// ✅ ATTENDANCE RULES
+const OFFICE_START_TIME = "09:30";
+const LATE_AFTER_TIME = "09:45";
+const HALF_DAY_AFTER_TIME = "13:00";
+
 /* ---------- HELPERS ---------- */
+function getAttendanceStatus(punchInTime: Date) {
+  const timeStr = punchInTime.toTimeString().slice(0, 5);
+
+  if (timeStr <= OFFICE_START_TIME) {
+    return { status: "present", remark: "On Time" };
+  }
+
+  if (timeStr <= LATE_AFTER_TIME) {
+    return { status: "late", remark: "Late Entry" };
+  }
+
+  if (timeStr <= HALF_DAY_AFTER_TIME) {
+    return { status: "half-day", remark: "Half Day" };
+  }
+
+  return { status: "absent", remark: "Too Late" };
+}
+
 function getDistanceInMeters(
   lat1: number,
   lon1: number,
@@ -134,19 +157,26 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
       return;
     }
 
+    // ✅ APPLY RULE ENGINE
+    const punchInTime = new Date();
+    const attendanceResult = getAttendanceStatus(punchInTime);
+
     const { error: insertError } = await supabase
       .from("attendance")
       .insert({
         employee_id: employeeId,
         date: today,
-        punch_in: new Date().toISOString(),
-        status: "present",
+        punch_in: punchInTime.toISOString(),
+        status: attendanceResult.status,
+        remark: attendanceResult.remark,
       });
 
     if (insertError) {
       setStatus(insertError.message);
     } else {
-      setStatus("✅ Attendance marked successfully");
+      setStatus(
+        `✅ Attendance marked (${attendanceResult.remark})`
+      );
     }
 
     setEmployeeId("");
@@ -156,7 +186,6 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4 pb-20">
-      {/* CENTER CARD */}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-4">
         <h2 className="text-2xl font-bold text-center text-blue-700">
           Attendance Punch
@@ -171,7 +200,7 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
         {!showFace && (
           <div className="space-y-4">
             <input
-              className="w-full rounded-lg border border-blue-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-blue-300 px-4 py-3 text-gray-900"
               placeholder="Enter Employee ID"
               value={employeeId}
               disabled={disabled}
@@ -181,17 +210,9 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
             <button
               onClick={startPunchIn}
               disabled={loading || disabled}
-              className={`w-full py-3 rounded-lg text-lg font-semibold transition ${
-                disabled
-                  ? "bg-gray-400 cursor-not-allowed text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className="w-full py-3 rounded-lg text-lg font-semibold bg-blue-600 text-white"
             >
-              {disabled
-                ? "Face Not Registered"
-                : loading
-                ? "Checking..."
-                : "Punch In"}
+              {loading ? "Checking..." : "Punch In"}
             </button>
           </div>
         )}
@@ -206,7 +227,6 @@ export default function Attendance({ disabled = false }: AttendanceProps) {
         )}
       </div>
 
-      {/* MOBILE BOTTOM NAV */}
       <MobileBottomNav />
     </div>
   );
