@@ -29,14 +29,14 @@ function getAttendanceStatus(punchInTime: Date) {
   }
 
   if (timeStr <= LATE_AFTER_TIME) {
-    return { status: "late", remark: "Late Entry" };
+    return { status: "present", remark: "Late Entry" };
   }
 
   if (timeStr <= HALF_DAY_AFTER_TIME) {
-    return { status: "half-day", remark: "Half Day" };
+    return { status: "present", remark: "Half Day" };
   }
 
-  return { status: "absent", remark: "Too Late" };
+  return { status: "present", remark: "Late" };
 }
 
 function getDistanceInMeters(
