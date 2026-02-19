@@ -73,7 +73,7 @@ function faceDistance(a: number[], b: number[]) {
   );
 }
 
-/* ---------- COMPONENT ---------- */
+/* --------jkjkbjbjbjbjbjb-- COMPONENT ---------- */
 export default function Attendance({ disabled = false }: AttendanceProps) {
   const [employeeId, setEmployeeId] = useState("");
   const [loading, setLoading] = useState(false);
